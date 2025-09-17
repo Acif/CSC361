@@ -1,0 +1,35 @@
+13:25:15.448296 ARP, Request who-has 192.168.1.1 tell 192.168.1.100, length 28
+13:25:15.448310 ARP, Reply 192.168.1.1 is-at 4e:ab:cf:ba:a0:0d, length 28
+13:25:15.448312 IP 192.168.1.100.47480 > 10.10.1.100.80: Flags [S], seq 1301895824, win 64240, options [mss 1460,sackOK,TS val 2335099713 ecr 0,nop,wscale 7], length 0
+13:25:15.448332 IP 10.10.1.100.80 > 192.168.1.100.47480: Flags [S.], seq 450657452, ack 1301895825, win 65160, options [mss 1460,sackOK,TS val 3060250922 ecr 2335099713,nop,wscale 7], length 0
+13:25:15.448363 IP 192.168.1.100.47480 > 10.10.1.100.80: Flags [.], ack 1, win 502, options [nop,nop,TS val 2335099713 ecr 3060250922], length 0
+13:25:15.448504 IP 192.168.1.100.47480 > 10.10.1.100.80: Flags [P.], seq 1:143, ack 1, win 502, options [nop,nop,TS val 2335099713 ecr 3060250922], length 142: HTTP: GET /lab2.html HTTP/1.1
+13:25:15.448517 IP 10.10.1.100.80 > 192.168.1.100.47480: Flags [.], ack 143, win 508, options [nop,nop,TS val 3060250922 ecr 2335099713], length 0
+13:25:15.448712 IP 10.10.1.100.80 > 192.168.1.100.47480: Flags [FP.], seq 1:609, ack 143, win 508, options [nop,nop,TS val 3060250922 ecr 2335099713], length 608: HTTP: HTTP/1.1 200 OK
+13:25:15.448775 IP 192.168.1.100.47480 > 10.10.1.100.80: Flags [.], ack 610, win 501, options [nop,nop,TS val 2335099713 ecr 3060250922], length 0
+13:25:15.453721 IP 192.168.1.100.47480 > 10.10.1.100.80: Flags [F.], seq 143, ack 610, win 501, options [nop,nop,TS val 2335099718 ecr 3060250922], length 0
+13:25:15.453741 IP 10.10.1.100.80 > 192.168.1.100.47480: Flags [.], ack 144, win 508, options [nop,nop,TS val 3060250927 ecr 2335099718], length 0
+13:25:15.461051 IP 192.168.1.100.47492 > 10.10.1.100.80: Flags [S], seq 2312355617, win 64240, options [mss 1460,sackOK,TS val 2335099725 ecr 0,nop,wscale 7], length 0
+13:25:15.461066 IP 10.10.1.100.80 > 192.168.1.100.47492: Flags [S.], seq 3333193186, ack 2312355618, win 65160, options [mss 1460,sackOK,TS val 3060250934 ecr 2335099725,nop,wscale 7], length 0
+13:25:15.461073 IP 192.168.1.100.47492 > 10.10.1.100.80: Flags [.], ack 1, win 502, options [nop,nop,TS val 2335099725 ecr 3060250934], length 0
+13:25:15.461152 IP 192.168.1.100.47492 > 10.10.1.100.80: Flags [P.], seq 1:178, ack 1, win 502, options [nop,nop,TS val 2335099726 ecr 3060250934], length 177: HTTP: GET /x.png HTTP/1.1
+13:25:15.461163 IP 10.10.1.100.80 > 192.168.1.100.47492: Flags [.], ack 178, win 508, options [nop,nop,TS val 3060250935 ecr 2335099726], length 0
+13:25:15.461277 IP 10.10.1.100.80 > 192.168.1.100.47492: Flags [.], seq 1:1449, ack 178, win 508, options [nop,nop,TS val 3060250935 ecr 2335099726], length 1448: HTTP: HTTP/1.1 200 OK
+13:25:15.461280 IP 10.10.1.100.80 > 192.168.1.100.47492: Flags [P.], seq 1449:2897, ack 178, win 508, options [nop,nop,TS val 3060250935 ecr 2335099726], length 1448: HTTP
+13:25:15.461318 IP 10.10.1.100.80 > 192.168.1.100.47492: Flags [FP.], seq 2897:3629, ack 178, win 508, options [nop,nop,TS val 3060250935 ecr 2335099726], length 732: HTTP
+13:25:15.461336 IP 192.168.1.100.47492 > 10.10.1.100.80: Flags [.], ack 2897, win 480, options [nop,nop,TS val 2335099726 ecr 3060250935], length 0
+13:25:15.463409 IP 192.168.1.100.47492 > 10.10.1.100.80: Flags [F.], seq 178, ack 3630, win 501, options [nop,nop,TS val 2335099728 ecr 3060250935], length 0
+13:25:15.463431 IP 10.10.1.100.80 > 192.168.1.100.47492: Flags [.], ack 179, win 508, options [nop,nop,TS val 3060250937 ecr 2335099728], length 0
+13:25:15.467503 IP 192.168.1.100.47506 > 10.10.1.100.80: Flags [S], seq 1047411297, win 64240, options [mss 1460,sackOK,TS val 2335099732 ecr 0,nop,wscale 7], length 0
+13:25:15.467524 IP 10.10.1.100.80 > 192.168.1.100.47506: Flags [S.], seq 840221153, ack 1047411298, win 65160, options [mss 1460,sackOK,TS val 3060250941 ecr 2335099732,nop,wscale 7], length 0
+13:25:15.467531 IP 192.168.1.100.47506 > 10.10.1.100.80: Flags [.], ack 1, win 502, options [nop,nop,TS val 2335099732 ecr 3060250941], length 0
+13:25:15.467593 IP 192.168.1.100.47506 > 10.10.1.100.80: Flags [P.], seq 1:178, ack 1, win 502, options [nop,nop,TS val 2335099732 ecr 3060250941], length 177: HTTP: GET /z.png HTTP/1.1
+13:25:15.467601 IP 10.10.1.100.80 > 192.168.1.100.47506: Flags [.], ack 178, win 508, options [nop,nop,TS val 3060250941 ecr 2335099732], length 0
+13:25:15.467688 IP 10.10.1.100.80 > 192.168.1.100.47506: Flags [.], seq 1:1449, ack 178, win 508, options [nop,nop,TS val 3060250941 ecr 2335099732], length 1448: HTTP: HTTP/1.1 200 OK
+13:25:15.467689 IP 10.10.1.100.80 > 192.168.1.100.47506: Flags [P.], seq 1449:2897, ack 178, win 508, options [nop,nop,TS val 3060250941 ecr 2335099732], length 1448: HTTP
+13:25:15.467719 IP 10.10.1.100.80 > 192.168.1.100.47506: Flags [FP.], seq 2897:3622, ack 178, win 508, options [nop,nop,TS val 3060250941 ecr 2335099732], length 725: HTTP
+13:25:15.467731 IP 192.168.1.100.47506 > 10.10.1.100.80: Flags [.], ack 2897, win 480, options [nop,nop,TS val 2335099732 ecr 3060250941], length 0
+13:25:15.470445 IP 192.168.1.100.47506 > 10.10.1.100.80: Flags [F.], seq 178, ack 3623, win 501, options [nop,nop,TS val 2335099735 ecr 3060250941], length 0
+13:25:15.470465 IP 10.10.1.100.80 > 192.168.1.100.47506: Flags [.], ack 179, win 508, options [nop,nop,TS val 3060250944 ecr 2335099735], length 0
+13:25:20.528443 ARP, Request who-has 192.168.1.100 tell 192.168.1.1, length 28
+13:25:20.528517 ARP, Reply 192.168.1.100 is-at 12:96:66:c5:ca:83, length 28

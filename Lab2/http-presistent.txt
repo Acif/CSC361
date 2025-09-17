@@ -1,0 +1,24 @@
+13:28:33.145627 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [S], seq 3239839919, win 64240, options [mss 1460,sackOK,TS val 2335297410 ecr 0,nop,wscale 7], length 0
+13:28:33.145681 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [S.], seq 4251922828, ack 3239839920, win 65160, options [mss 1460,sackOK,TS val 3060448619 ecr 2335297410,nop,wscale 7], length 0
+13:28:33.145691 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [.], ack 1, win 502, options [nop,nop,TS val 2335297410 ecr 3060448619], length 0
+13:28:33.145770 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [P.], seq 1:148, ack 1, win 502, options [nop,nop,TS val 2335297410 ecr 3060448619], length 147: HTTP: GET /lab2.html HTTP/1.1
+13:28:33.145780 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [.], ack 148, win 508, options [nop,nop,TS val 3060448619 ecr 2335297410], length 0
+13:28:33.145929 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [P.], seq 1:614, ack 148, win 508, options [nop,nop,TS val 3060448619 ecr 2335297410], length 613: HTTP: HTTP/1.1 200 OK
+13:28:33.145944 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [.], ack 614, win 498, options [nop,nop,TS val 2335297410 ecr 3060448619], length 0
+13:28:33.156843 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [P.], seq 148:330, ack 614, win 501, options [nop,nop,TS val 2335297421 ecr 3060448619], length 182: HTTP: GET /x.png HTTP/1.1
+13:28:33.156862 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [.], ack 330, win 507, options [nop,nop,TS val 3060448630 ecr 2335297421], length 0
+13:28:33.156956 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [.], seq 614:2062, ack 330, win 507, options [nop,nop,TS val 3060448630 ecr 2335297421], length 1448: HTTP: HTTP/1.1 200 OK
+13:28:33.156958 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [P.], seq 2062:3510, ack 330, win 507, options [nop,nop,TS val 3060448630 ecr 2335297421], length 1448: HTTP
+13:28:33.156989 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [P.], seq 3510:4247, ack 330, win 507, options [nop,nop,TS val 3060448630 ecr 2335297421], length 737: HTTP
+13:28:33.157000 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [.], ack 3510, win 479, options [nop,nop,TS val 2335297421 ecr 3060448630], length 0
+13:28:33.157004 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [.], ack 4247, win 474, options [nop,nop,TS val 2335297421 ecr 3060448630], length 0
+13:28:33.172675 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [P.], seq 330:512, ack 4247, win 501, options [nop,nop,TS val 2335297437 ecr 3060448630], length 182: HTTP: GET /z.png HTTP/1.1
+13:28:33.172703 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [.], ack 512, win 506, options [nop,nop,TS val 3060448646 ecr 2335297437], length 0
+13:28:33.172811 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [.], seq 4247:5695, ack 512, win 506, options [nop,nop,TS val 3060448646 ecr 2335297437], length 1448: HTTP: HTTP/1.1 200 OK
+13:28:33.172813 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [P.], seq 5695:7143, ack 512, win 506, options [nop,nop,TS val 3060448646 ecr 2335297437], length 1448: HTTP
+13:28:33.172852 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [P.], seq 7143:7873, ack 512, win 506, options [nop,nop,TS val 3060448646 ecr 2335297437], length 730: HTTP
+13:28:33.172867 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [.], ack 7143, win 479, options [nop,nop,TS val 2335297437 ecr 3060448646], length 0
+13:28:33.172874 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [.], ack 7873, win 474, options [nop,nop,TS val 2335297437 ecr 3060448646], length 0
+13:28:33.178202 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [F.], seq 512, ack 7873, win 501, options [nop,nop,TS val 2335297443 ecr 3060448646], length 0
+13:28:33.178245 IP 10.10.1.100.80 > 192.168.1.100.49240: Flags [F.], seq 7873, ack 513, win 506, options [nop,nop,TS val 3060448652 ecr 2335297443], length 0
+13:28:33.178252 IP 192.168.1.100.49240 > 10.10.1.100.80: Flags [.], ack 7874, win 501, options [nop,nop,TS val 2335297443 ecr 3060448652], length 0
