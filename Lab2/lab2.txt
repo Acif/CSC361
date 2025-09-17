@@ -1,0 +1,15 @@
+Persistent HTTP Disadvantage and Advantage:
+	
+	Disadvantage:
+		in a persistent HTTP connection, the connection remains open while multiple objects are requested. This means that the server must maintain a buffer state for the TCP session until it is closed explicitly. This is not ideal if there is a large number of users all using this connection at once since it will increase memory usage and server resource consumption. On top of this, long lived connections can hold onto resources even if the user is in an idle state.
+
+Advantage:
+	All the GET requests are sent over the same TCP connection (only one SYN/SYN-ACK/ACK handshake at the beginning, and one FIN/ACK exchange at the end). This reduces the setup overhead, since there are no repeat handshakes, so additional objects can be received with minimal delay. In my test, the time between sending the GET request and receiving the 200 OK was only about 100~200 microseconds. In a real internet setting, this would greatly reduce total load times on pages.
+
+Non-Persistent HTTP Disadvantage and Advantage:
+	
+	Disadvantage:
+		The main disadvantage of non-persistent is the extra overhead of additional handshakes and connection terminations. In my test, the total packet count is much higher than in the persistent test even though the same 3 objects are fetched. These repeated setups also add latency for each object. In my test the delays are very small and pretty much irrelevant since it was over LAN, but over WAN they would add up and cause more noticeable slow downs.
+
+	Advantage:
+		In the non-persistent test, each object gets its own TCP connection. There are three separate SYN/SYN-ACK/ACK handshakes and three corresponding FIN/ACK teardowns. This shows that after a response is delivered, the connection state is released by both client and server. Non-persistent connections simplify server resource management, since it does not need to keep a connection in idle, which is good for uses where there are many short lived requests.
