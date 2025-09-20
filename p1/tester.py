@@ -4,7 +4,6 @@ import socket
 import ssl
 from urllib.parse import urlparse
 from typing import Tuple, List, Optional
-import certifi
 
 DEFAULT_HTTP_PORT = 80
 DEFAULT_HTTPS_PORT = 443
