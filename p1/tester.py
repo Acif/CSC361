@@ -105,11 +105,8 @@ def send_request(scheme: str, host: str, port: int, request: str) -> str:
     data = bytearray()
 
     if scheme == "https":
-        # First probe ALPN to see if server supports h2; record for heuristics.
-        # Then reopen with http/1.1 to keep our parser simple.
+        # Probe ALPN to see if server supports h2.
         alpn = alpn_probe_https(host, port)  # may be 'h2', 'http/1.1', or None
-        # Keep a tiny note in the request (not required; can remove)
-        # Open real TLS channel pinned to http/1.1 so response is parseable.
         s = _open_tcp(host, port)
         try:
             tls = _wrap_tls(s, host, ["http/1.1"])
@@ -123,14 +120,11 @@ def send_request(scheme: str, host: str, port: int, request: str) -> str:
             finally:
                 tls.close()
         finally:
-            # _wrap_tls takes ownership; ensure underlying is closed on failure paths
             try:
                 s.close()
             except Exception:
                 pass
         # Store ALPN hint at the start of the buffer as a faux header for later detection logic.
-        # (We won't print it; we just parse it out of band.)
-        # Alternatively, return both bytes+alpn; but to keep signature, we embed a marker.
         marker = f"\r\nX-ALPN-SELECTED: {alpn or ''}\r\n"
         return marker + data.decode("iso-8859-1", errors="replace")
 
@@ -153,9 +147,7 @@ def send_request(scheme: str, host: str, port: int, request: str) -> str:
 def split_response(response: str) -> Tuple[str, str]:
     """
     Split response into header and body.
-    (Strips any internal X-ALPN-SELECTED marker we might have prepended.)
     """
-    # Remove the internal marker if present
     if response.startswith("\r\nX-ALPN-SELECTED:"):
         # Drop the first marker line
         nl = response.find("\r\n", 2)
@@ -211,7 +203,6 @@ def detect_http2_support(headers_seen: List[str], status_lines: List[str], alpn_
     if (alpn_selected or "").lower() == "h2":
         return "yes"
 
-    # 2) Heuristics in headers
     for sl in status_lines:
         if sl.upper().startswith("HTTP/2"):
             return "yes"
@@ -262,7 +253,6 @@ def is_password_protected(headers_seen: List[str], codes_seen: List[int]) -> str
 # ---------------------------
 
 def main() -> int:
-    # Accept CLI arg or stdin
     if len(sys.argv) == 2:
         uri = sys.argv[1].strip()
     else:
@@ -281,7 +271,7 @@ def main() -> int:
     headers_seen: List[str] = []
     status_lines: List[str] = []
     codes_seen: List[int] = []
-    alpn_selected: Optional[str] = None  # last HTTPS ALPN result (if any)
+    alpn_selected: Optional[str] = None
 
     current_scheme = scheme
     current_host = host
@@ -293,7 +283,7 @@ def main() -> int:
     for _ in range(MAX_REDIRECTS + 1):
         request = build_http_request(current_host, current_path)
 
-        # Debug preview (print once)
+        # Debug preview
         if not debug_preview_printed:
             print("--- Request begin ---")
             print(request.rstrip("\r\n"))
@@ -307,7 +297,7 @@ def main() -> int:
             print(f"Network error: {e}")
             return 3
 
-        # Capture ALPN if present in our internal marker
+        # Capture ALPN if present
         sel = pick_alpn_marker(raw)
         if sel is not None:
             alpn_selected = sel
@@ -350,11 +340,11 @@ def main() -> int:
             current_path = npath
             print(f"\n[Info] Following redirect to {current_scheme}://{current_host}:{current_port}{current_path}\n")
             continue
-
-        # Not a redirect -> done
         break
 
-    # Compose final report
+    # ---------------------------
+    # Final Output
+    # ---------------------------
     http2 = detect_http2_support(headers_seen, status_lines, alpn_selected)
     cookies = extract_cookie_triplets(headers_seen[-1] if headers_seen else "")
     pw = is_password_protected(headers_seen, codes_seen)
