@@ -5,6 +5,10 @@ import ssl
 from urllib.parse import urlparse
 from typing import Tuple, List, Optional
 
+print(sys.version)
+print(ssl.OPENSSL_VERSION)
+print(ssl.get_default_verify_paths())
+
 DEFAULT_HTTP_PORT = 80
 DEFAULT_HTTPS_PORT = 443
 RECV_BUF = 4096

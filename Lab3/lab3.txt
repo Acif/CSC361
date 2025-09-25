@@ -1,0 +1,15 @@
+(a) The DNS query messages from 192.168.1.100 are recursive queries. 
+    This is because the client requests that the resolver (172.16.1.1) fully resolve the domain name on its behalf.
+
+(b) The DNS query messages from 172.16.1.1 are iterative queries. 
+    The resolver queries authoritative or upstream servers (142.104.80.2, 142.104.6.1) step by step, without requesting recursion.
+
+(c) Advantages and disadvantages of recursive vs iterative DNS queries:
+
+Recursive Queries:
+- Advantages: The client receives a final answer with only one query to the resolver. Simplifies client implementation and can be faster due to caching at the resolver.
+- Disadvantages: Puts higher workload on the recursive resolver, which must perform multiple lookups. If the resolver is slow or unavailable, the client cannot resolve names.
+
+Iterative Queries:
+- Advantages: Spreads the resolution workload across multiple servers. More control over the resolution process, and authoritative servers handle fewer requests per query.
+- Disadvantages: Clients must handle multiple queries and responses, leading to more complexity and potentially longer resolution times without caching.
