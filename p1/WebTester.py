@@ -191,7 +191,7 @@ def pick_alpn_marker(raw_response: str) -> Optional[str]:
     return None
 
 def detect_http2_support(headers_seen: List[str], status_lines: List[str], alpn_selected: Optional[str]) -> str:
-    # 1) If ALPN probe picked 'h2', the server supports HTTP/2.
+    # If ALPN probe picked 'h2', the server supports HTTP/2.
     if (alpn_selected or "").lower() == "h2":
         return "yes"
 
