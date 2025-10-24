@@ -1,0 +1,10 @@
+Answer:
+In addition to the IP address and TCP port number, the NAT device also modifies the IP header checksum and the TCP checksum.
+
+Explanation:
+When NAT changes the source or destination IP address and/or TCP port number, the checksum values in both headers become invalid because they are calculated based on those fields.
+
+- The IP header checksum covers only the IP header itself, so any change to the source or destination IP address requires recomputing this checksum.
+- The TCP checksum covers a pseudo-header (which includes the source and destination IP addresses), the TCP header, and the payload. Therefore, when either the IP address or the port number changes, the NAT must also recalculate the TCP checksum to ensure packet integrity.
+
+No other fields in the IP or TCP headers are typically changed by NAT.
