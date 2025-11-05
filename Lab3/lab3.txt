@@ -7,7 +7,8 @@
 (c) Advantages and disadvantages of recursive vs iterative DNS queries:
 
 Recursive Queries:
-- Advantages: The client receives a final answer with only one query to the resolver. Simplifies client implementation and can be faster due to caching at the resolver.
+- Advantages: 
+	The client receives a final answer with only one query to the resolver. Simplifies client implementation and can be faster due to caching at the resolver.
 - Disadvantages: Puts higher workload on the recursive resolver, which must perform multiple lookups. If the resolver is slow or unavailable, the client cannot resolve names.
 
 Iterative Queries:
