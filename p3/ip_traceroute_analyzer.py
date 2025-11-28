@@ -8,19 +8,35 @@ Analyzes IP datagrams from traceroute pcap files
 import struct
 import sys
 from collections import defaultdict
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Optional
 import math
+
+
+# Constants
+TRACEROUTE_PORT_MIN = 33434
+TRACEROUTE_PORT_MAX = 33529
+ICMP_ECHO_REQUEST = 8
+ICMP_ECHO_REPLY = 0
+ICMP_TIME_EXCEEDED = 11
+ICMP_DEST_UNREACHABLE = 3
+PROTOCOL_ICMP = 1
+PROTOCOL_UDP = 17
 
 
 class IPPacket:
     """Represents an IP packet with relevant fields"""
-    def __init__(self, data, timestamp):
+    
+    def __init__(self, data: bytes, timestamp: float):
         self.timestamp = timestamp
         self.data = data
         self.parse_ip_header()
         
     def parse_ip_header(self):
         """Parse IP header fields"""
+        # Validate minimum packet size (Ethernet + IP header)
+        if len(self.data) < 34:
+            raise ValueError("Packet too small for IP header")
+        
         # IP header starts at offset 14 (after Ethernet header)
         ip_header = self.data[14:34]
         
@@ -53,9 +69,9 @@ class IPPacket:
         # Parse protocol-specific data
         self.payload_start = 14 + self.header_length
         
-        if self.protocol == 1:  # ICMP
+        if self.protocol == PROTOCOL_ICMP:
             self.parse_icmp()
-        elif self.protocol == 17:  # UDP
+        elif self.protocol == PROTOCOL_UDP:
             self.parse_udp()
     
     def parse_icmp(self):
@@ -75,7 +91,7 @@ class IPPacket:
         self.icmp_seq = icmp_data[4]
         
         # For ICMP error messages (type 11, type 3), extract original packet info
-        if self.icmp_type == 11 or self.icmp_type == 3:
+        if self.icmp_type == ICMP_TIME_EXCEEDED or self.icmp_type == ICMP_DEST_UNREACHABLE:
             self.parse_icmp_error()
     
     def parse_icmp_error(self):
@@ -101,14 +117,14 @@ class IPPacket:
         orig_header_length = orig_ihl * 4
         
         # Parse original transport layer
-        if self.orig_protocol == 17:  # UDP
+        if self.orig_protocol == PROTOCOL_UDP:
             udp_start = orig_ip_start + orig_header_length
             if len(self.data) >= udp_start + 4:
                 udp_header = self.data[udp_start:udp_start + 4]
                 udp_data = struct.unpack('!HH', udp_header)
                 self.orig_src_port = udp_data[0]
                 self.orig_dst_port = udp_data[1]
-        elif self.orig_protocol == 1:  # ICMP
+        elif self.orig_protocol == PROTOCOL_ICMP:
             icmp_start = orig_ip_start + orig_header_length
             if len(self.data) >= icmp_start + 8:
                 icmp_header = self.data[icmp_start:icmp_start + 8]
@@ -132,7 +148,7 @@ class IPPacket:
         self.udp_checksum = udp_data[3]
     
     @staticmethod
-    def ip_to_string(ip_bytes):
+    def ip_to_string(ip_bytes: bytes) -> str:
         """Convert IP address bytes to string"""
         return '.'.join(map(str, ip_bytes))
 
@@ -140,67 +156,91 @@ class IPPacket:
 class TracerouteAnalyzer:
     """Analyzes traceroute pcap files"""
     
-    def __init__(self, pcap_file):
+    def __init__(self, pcap_file: str):
         self.pcap_file = pcap_file
-        self.packets = []
-        self.source_ip = None
-        self.ultimate_dest_ip = None
-        self.intermediate_routers = {}  # hop_count -> router_ip
-        self.protocols = set()
-        self.fragments = defaultdict(list)  # identification -> list of fragments
-        self.rtts = defaultdict(list)  # router_ip -> list of RTTs
+        self.packets: List[IPPacket] = []
+        self.source_ip: Optional[str] = None
+        self.ultimate_dest_ip: Optional[str] = None
+        self.intermediate_routers: Dict = {}  # hop_count -> router_ip
+        self.protocols: Set[int] = set()
+        self.fragments: Dict[int, List[IPPacket]] = defaultdict(list)
+        self.rtts: Dict[str, List[float]] = defaultdict(list)
+        self.fragmentation_info: Dict = {}
         
     def read_pcap(self):
         """Read and parse pcap file"""
-        with open(self.pcap_file, 'rb') as f:
-            # Read global header (24 bytes)
-            global_header = f.read(24)
-            if len(global_header) < 24:
-                return
-            
-            # Parse global header
-            magic = struct.unpack('I', global_header[0:4])[0]
-            
-            # Determine byte order
-            if magic == 0xa1b2c3d4:
-                endian = '!'
-            elif magic == 0xd4c3b2a1:
-                endian = '<'
-            elif magic == 0xa1b23c4d or magic == 0x4d3cb2a1:
-                # pcapng format - use little endian
-                endian = '<'
-            else:
-                print(f"Unknown pcap format: {magic:08x}")
-                return
-            
-            # Read packets
-            while True:
-                # Read packet header (16 bytes)
-                packet_header = f.read(16)
-                if len(packet_header) < 16:
-                    break
+        try:
+            with open(self.pcap_file, 'rb') as f:
+                # Read global header (24 bytes)
+                global_header = f.read(24)
+                if len(global_header) < 24:
+                    print(f"Error: Invalid pcap file (header too small)")
+                    return
                 
-                # Parse packet header
-                ph = struct.unpack(endian + 'IIII', packet_header)
-                ts_sec = ph[0]
-                ts_usec = ph[1]
-                incl_len = ph[2]
-                orig_len = ph[3]
+                # Parse global header
+                # Read magic number in native byte order first to detect format
+                magic_native = struct.unpack('=I', global_header[0:4])[0]
                 
-                # Calculate timestamp in milliseconds
-                timestamp = ts_sec * 1000.0 + ts_usec / 1000.0
+                # Determine byte order and time precision
+                if magic_native == 0xa1b2c3d4:
+                    endian = '>'  # Big endian
+                    time_precision = 1000.0  # microseconds
+                elif magic_native == 0xd4c3b2a1:
+                    endian = '<'  # Little endian
+                    time_precision = 1000.0  # microseconds
+                elif magic_native == 0xa1b23c4d:
+                    # Nanosecond precision pcap - little endian
+                    # Note: Despite the "big endian" magic marker, these files are often little endian
+                    endian = '<'
+                    time_precision = 1000000.0  # nanoseconds
+                elif magic_native == 0x4d3cb2a1:
+                    # Nanosecond precision pcap - big endian
+                    endian = '>'
+                    time_precision = 1000000.0  # nanoseconds
+                else:
+                    print(f"Error: Unknown pcap format: {magic_native:08x}")
+                    return
                 
-                # Read packet data
-                packet_data = f.read(incl_len)
-                if len(packet_data) < incl_len:
-                    break
-                
-                # Parse packet
-                try:
-                    packet = IPPacket(packet_data, timestamp)
-                    self.packets.append(packet)
-                except:
-                    continue
+                # Read packets
+                while True:
+                    # Read packet header (16 bytes)
+                    packet_header = f.read(16)
+                    if len(packet_header) < 16:
+                        break
+                    
+                    # Parse packet header
+                    ph = struct.unpack(endian + 'IIII', packet_header)
+                    ts_sec = ph[0]
+                    ts_usec = ph[1]
+                    incl_len = ph[2]
+                    orig_len = ph[3]
+                    
+                    # Calculate timestamp in milliseconds
+                    # time_precision is 1000.0 for microseconds, 1000000.0 for nanoseconds
+                    timestamp = ts_sec * 1000.0 + ts_usec / time_precision
+                    
+                    # Read packet data
+                    packet_data = f.read(incl_len)
+                    if len(packet_data) < incl_len:
+                        break
+                    
+                    # Parse packet
+                    try:
+                        packet = IPPacket(packet_data, timestamp)
+                        self.packets.append(packet)
+                    except (ValueError, struct.error) as e:
+                        # Skip malformed packets
+                        continue
+                    except Exception as e:
+                        # Log unexpected errors but continue
+                        print(f"Warning: Unexpected error parsing packet: {e}")
+                        continue
+        except FileNotFoundError:
+            print(f"Error: File '{self.pcap_file}' not found")
+            sys.exit(1)
+        except IOError as e:
+            print(f"Error reading file: {e}")
+            sys.exit(1)
     
     def analyze(self):
         """Analyze the traceroute packets"""
@@ -211,10 +251,11 @@ class TracerouteAnalyzer:
         
         # First, identify all traceroute UDP datagrams by their first fragments
         for packet in self.packets:
-            if packet.protocol == 17:  # UDP
+            if packet.protocol == PROTOCOL_UDP:
                 # Check if it's a traceroute packet (port range 33434-33529)
                 # This will only match first fragments (which have the UDP header)
-                if hasattr(packet, 'dst_port') and packet.dst_port and 33434 <= packet.dst_port <= 33529:
+                if hasattr(packet, 'dst_port') and packet.dst_port and \
+                   TRACEROUTE_PORT_MIN <= packet.dst_port <= TRACEROUTE_PORT_MAX:
                     all_udp_ids.add(packet.identification)
                     if self.source_ip is None:
                         self.source_ip = packet.src_ip
@@ -224,13 +265,14 @@ class TracerouteAnalyzer:
             self.protocols.add(packet.protocol)
             
             # Identify outgoing traceroute packets
-            if packet.protocol == 17:  # UDP
+            if packet.protocol == PROTOCOL_UDP:
                 # Check if this packet belongs to a traceroute datagram
-                # (either it has the right port, or its ID matches a known traceroute datagram)
                 is_traceroute = False
-                if hasattr(packet, 'dst_port') and packet.dst_port and 33434 <= packet.dst_port <= 33529:
+                if hasattr(packet, 'dst_port') and packet.dst_port and \
+                   TRACEROUTE_PORT_MIN <= packet.dst_port <= TRACEROUTE_PORT_MAX:
                     is_traceroute = True
-                elif self.source_ip and packet.identification in all_udp_ids and packet.src_ip == self.source_ip:
+                elif self.source_ip and packet.identification in all_udp_ids and \
+                     packet.src_ip == self.source_ip:
                     # This is a subsequent fragment of a traceroute datagram
                     is_traceroute = True
                 
@@ -239,14 +281,14 @@ class TracerouteAnalyzer:
                     if self.ultimate_dest_ip is None:
                         self.ultimate_dest_ip = packet.dst_ip
                     
-                    # Track all fragments
+                    # Track ALL fragments (including first fragment with offset=0, MF=True)
                     if packet.fragment_offset > 0 or packet.mf_flag:
                         self.fragments[packet.identification].append(packet)
                         
-            elif packet.protocol == 1:  # ICMP
+            elif packet.protocol == PROTOCOL_ICMP:
                 if hasattr(packet, 'icmp_type'):
                     # ICMP echo request (traceroute in Windows)
-                    if packet.icmp_type == 8:
+                    if packet.icmp_type == ICMP_ECHO_REQUEST:
                         outgoing_packets.append(packet)
                         if self.source_ip is None:
                             self.source_ip = packet.src_ip
@@ -258,7 +300,8 @@ class TracerouteAnalyzer:
                             self.fragments[packet.identification].append(packet)
                     
                     # ICMP error responses (TTL exceeded or Destination unreachable)
-                    elif packet.icmp_type == 11 or packet.icmp_type == 3:
+                    elif packet.icmp_type == ICMP_TIME_EXCEEDED or \
+                         packet.icmp_type == ICMP_DEST_UNREACHABLE:
                         icmp_responses.append(packet)
         
         # Match outgoing packets with ICMP responses to calculate RTTs
@@ -267,18 +310,44 @@ class TracerouteAnalyzer:
         # Analyze fragments
         self.analyze_fragments()
     
-    def match_packets_and_calculate_rtt(self, outgoing_packets, icmp_responses):
-        """Match outgoing packets with ICMP responses and calculate RTT"""
+    def match_packets_and_calculate_rtt(self, outgoing_packets: List[IPPacket], 
+                                       icmp_responses: List[IPPacket]):
+        """Match outgoing packets with ICMP responses and calculate RTT
         
-        # Build a mapping of source ports to outgoing packets for quick lookup
-        port_to_packets = defaultdict(list)
+        FIXED: Only calculates one RTT per probe, not one per fragment
+        """
+        
+        # Build a mapping to identify probes
+        # For fragmented packets, we need to group fragments by identification
+        probe_groups = defaultdict(lambda: {'packets': [], 'ttl': None, 'key': None})
+        
         for pkt in outgoing_packets:
-            if pkt.protocol == 17 and hasattr(pkt, 'src_port'):
-                port_to_packets[pkt.src_port].append(pkt)
-            elif pkt.protocol == 1 and hasattr(pkt, 'icmp_seq'):
-                # For ICMP, use sequence number as key
-                port_to_packets[('icmp', pkt.icmp_seq)].append(pkt)
+            if pkt.protocol == PROTOCOL_UDP and hasattr(pkt, 'src_port'):
+                # For UDP, use source port as the probe identifier
+                key = ('udp', pkt.src_port)
+                probe_groups[key]['packets'].append(pkt)
+                if probe_groups[key]['ttl'] is None:
+                    probe_groups[key]['ttl'] = pkt.ttl
+                probe_groups[key]['key'] = pkt.src_port
+                
+            elif pkt.protocol == PROTOCOL_UDP:
+                # This is a fragment without UDP header - match by identification
+                # Find the corresponding probe group by identification
+                for group_key, group_data in probe_groups.items():
+                    if group_key[0] == 'udp' and group_data['packets']:
+                        if any(p.identification == pkt.identification for p in group_data['packets']):
+                            group_data['packets'].append(pkt)
+                            break
+                            
+            elif pkt.protocol == PROTOCOL_ICMP and hasattr(pkt, 'icmp_seq'):
+                # For ICMP, use sequence number as the probe identifier
+                key = ('icmp', pkt.icmp_seq)
+                probe_groups[key]['packets'].append(pkt)
+                if probe_groups[key]['ttl'] is None:
+                    probe_groups[key]['ttl'] = pkt.ttl
+                probe_groups[key]['key'] = pkt.icmp_seq
         
+        # Now match ICMP responses to probe groups
         for response in icmp_responses:
             router_ip = response.src_ip
             
@@ -286,67 +355,79 @@ class TracerouteAnalyzer:
                 continue
             
             # Match based on protocol
-            if response.orig_protocol == 17:  # Original was UDP
-                # Match by source port only (identification field doesn't match)
+            if response.orig_protocol == PROTOCOL_UDP:
                 if not hasattr(response, 'orig_src_port'):
                     continue
                 
                 orig_port = response.orig_src_port
+                key = ('udp', orig_port)
                 
-                # Find all matching outgoing packets (all fragments with same port)
-                matched_packets = port_to_packets.get(orig_port, [])
-                
-                if not matched_packets:
+                if key not in probe_groups:
                     continue
                 
-                # Get the TTL from the first matched packet
-                matched_ttl = matched_packets[0].ttl
+                probe_group = probe_groups[key]
+                matched_ttl = probe_group['ttl']
                 
-                # Calculate RTT for all matched packets (all fragments)
-                for pkt in matched_packets:
-                    rtt = response.timestamp - pkt.timestamp
+                # FIXED: Calculate RTT only ONCE per probe
+                # Use the earliest fragment's timestamp (typically the first fragment)
+                if probe_group['packets']:
+                    earliest_pkt = min(probe_group['packets'], key=lambda p: p.timestamp)
+                    rtt = response.timestamp - earliest_pkt.timestamp
                     self.rtts[router_ip].append(rtt)
-                
-                # Track intermediate router by TTL
-                if router_ip != self.ultimate_dest_ip:
-                    if matched_ttl not in self.intermediate_routers:
-                        self.intermediate_routers[matched_ttl] = router_ip
-                    elif self.intermediate_routers[matched_ttl] != router_ip:
-                        # Multiple routers at same TTL (load balancing)
-                        # Add with a unique key
-                        key = f"{matched_ttl}.{len([k for k in self.intermediate_routers if str(k).startswith(str(matched_ttl))])}"
-                        self.intermediate_routers[key] = router_ip
+                    
+                    # Track intermediate router by TTL
+                    if router_ip != self.ultimate_dest_ip:
+                        self._add_intermediate_router(matched_ttl, router_ip)
             
-            elif response.orig_protocol == 1:  # Original was ICMP (Windows traceroute)
-                # Match by ICMP sequence number
+            elif response.orig_protocol == PROTOCOL_ICMP:
                 if not hasattr(response, 'orig_icmp_seq'):
                     continue
                 
                 orig_seq = response.orig_icmp_seq
+                key = ('icmp', orig_seq)
                 
-                # Find matching outgoing ICMP echo
-                matched_packets = port_to_packets.get(('icmp', orig_seq), [])
-                
-                if not matched_packets:
+                if key not in probe_groups:
                     continue
                 
-                matched_ttl = matched_packets[0].ttl
+                probe_group = probe_groups[key]
+                matched_ttl = probe_group['ttl']
                 
-                for pkt in matched_packets:
-                    rtt = response.timestamp - pkt.timestamp
+                # FIXED: Calculate RTT only ONCE per probe
+                if probe_group['packets']:
+                    earliest_pkt = min(probe_group['packets'], key=lambda p: p.timestamp)
+                    rtt = response.timestamp - earliest_pkt.timestamp
                     self.rtts[router_ip].append(rtt)
-                
-                # Track intermediate router
-                if router_ip != self.ultimate_dest_ip:
-                    if matched_ttl not in self.intermediate_routers:
-                        self.intermediate_routers[matched_ttl] = router_ip
+                    
+                    # Track intermediate router
+                    if router_ip != self.ultimate_dest_ip:
+                        self._add_intermediate_router(matched_ttl, router_ip)
+    
+    def _add_intermediate_router(self, ttl: int, router_ip: str):
+        """Add an intermediate router, handling load balancing cases
+        
+        FIXED: Improved load balancing detection with proper key generation
+        """
+        if ttl not in self.intermediate_routers:
+            self.intermediate_routers[ttl] = router_ip
+        elif self.intermediate_routers[ttl] != router_ip:
+            # Multiple routers at same TTL (load balancing)
+            # Find next available sub-index for this TTL
+            sub_index = 1
+            while True:
+                key = f"{ttl}.{sub_index}"
+                if key not in self.intermediate_routers:
+                    self.intermediate_routers[key] = router_ip
+                    break
+                elif self.intermediate_routers[key] == router_ip:
+                    # Already recorded this router
+                    break
+                sub_index += 1
     
     def analyze_fragments(self):
         """Analyze IP fragmentation information"""
         self.fragmentation_info = {}
         
         for frag_id, frag_list in self.fragments.items():
-            # A datagram is fragmented if it has more than one fragment OR if MF flag is set
             if len(frag_list) == 0:
                 continue
                 
@@ -369,20 +450,31 @@ class TracerouteAnalyzer:
                 'last_offset': last_offset_bytes
             }
     
-    def calculate_statistics(self, values):
+    def calculate_statistics(self, values: List[float]) -> Tuple[float, float]:
         """Calculate average and standard deviation"""
         if not values:
-            return 0, 0
+            return 0.0, 0.0
         
         avg = sum(values) / len(values)
         
         if len(values) == 1:
-            return avg, 0
+            return avg, 0.0
         
         variance = sum((x - avg) ** 2 for x in values) / len(values)
         std_dev = math.sqrt(variance)
         
         return avg, std_dev
+    
+    @staticmethod
+    def sort_key(item):
+        """Sort key function for router entries (handles both int and string keys)"""
+        key = item[0]
+        if isinstance(key, str):
+            # For keys like "3.1", extract the numeric part
+            parts = key.split('.')
+            return (int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
+        else:
+            return (int(key), 0)
     
     def print_results(self):
         """Print analysis results"""
@@ -391,17 +483,8 @@ class TracerouteAnalyzer:
         
         # Print intermediate routers in order
         print("The IP addresses of the intermediate destination nodes:")
-        # Sort by converting all keys to strings with proper sorting
-        def sort_key(item):
-            key = item[0]
-            if isinstance(key, str):
-                # For keys like "3.1", extract the numeric part
-                parts = key.split('.')
-                return (int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
-            else:
-                return (int(key), 0)
         
-        sorted_routers = sorted(self.intermediate_routers.items(), key=sort_key)
+        sorted_routers = sorted(self.intermediate_routers.items(), key=self.sort_key)
         for idx, (ttl, router_ip) in enumerate(sorted_routers, 1):
             if idx < len(sorted_routers):
                 print(f"    router {idx}: {router_ip},")
@@ -412,8 +495,8 @@ class TracerouteAnalyzer:
         
         # Print protocol values (only ICMP and UDP as per Q&A)
         print("The values in the protocol field of IP headers:")
-        protocol_names = {1: "ICMP", 17: "UDP"}
-        relevant_protocols = set(self.protocols) & {1, 17}
+        protocol_names = {PROTOCOL_ICMP: "ICMP", PROTOCOL_UDP: "UDP"}
+        relevant_protocols = set(self.protocols) & {PROTOCOL_ICMP, PROTOCOL_UDP}
         for proto in sorted(relevant_protocols):
             proto_name = protocol_names.get(proto, "Unknown")
             print(f"    {proto}: {proto_name}")
@@ -445,13 +528,13 @@ class TracerouteAnalyzer:
         print()
         
         # Print RTT statistics
-        for ttl, router_ip in sorted(self.intermediate_routers.items(), key=sort_key):
+        for ttl, router_ip in sorted(self.intermediate_routers.items(), key=self.sort_key):
             if router_ip in self.rtts:
                 avg, std = self.calculate_statistics(self.rtts[router_ip])
                 print(f"The avg RTT between {self.source_ip} and {router_ip} is: {avg:.0f} ms, the s.d. is: {std:.0f} ms")
         
         # Ultimate destination RTT
-        if self.ultimate_dest_ip in self.rtts:
+        if self.ultimate_dest_ip and self.ultimate_dest_ip in self.rtts:
             avg, std = self.calculate_statistics(self.rtts[self.ultimate_dest_ip])
             print(f"The avg RTT between {self.source_ip} and {self.ultimate_dest_ip} is: {avg:.0f} ms, the s.d. is: {std:.0f} ms")
 
