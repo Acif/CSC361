@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 IP Traceroute Analyzer
-CSc 361 Assignment 3
-Analyzes IP datagrams from traceroute pcap files
+CSC 361 Assignment 3
 """
 
 import struct
@@ -485,13 +484,24 @@ class TracerouteAnalyzer:
         print("The IP addresses of the intermediate destination nodes:")
         
         sorted_routers = sorted(self.intermediate_routers.items(), key=self.sort_key)
-        for idx, (ttl, router_ip) in enumerate(sorted_routers, 1):
-            if idx < len(sorted_routers):
-                print(f"    router {idx}: {router_ip},")
-            else:
-                print(f"    router {idx}: {router_ip}.")
         
-        print()
+        # Number routers sequentially (1, 2, 3...) but show TTL for each
+        router_num = 1
+        total_routers = len(sorted_routers)
+        
+        for ttl, router_ip in sorted_routers:
+            # Extract base TTL for display
+            base_ttl = int(str(ttl).split('.')[0])
+            
+            if router_num < total_routers:
+                print(f"\trouter {router_num}: {router_ip} (TTL={base_ttl})")
+            else:
+                # Last router doesn't have comma in expected output
+                print(f"\trouter {router_num}: {router_ip} (TTL={base_ttl})")
+            
+            router_num += 1
+        
+        print("=" * 64)
         
         # Print protocol values (only ICMP and UDP as per Q&A)
         print("The values in the protocol field of IP headers:")
@@ -499,24 +509,21 @@ class TracerouteAnalyzer:
         relevant_protocols = set(self.protocols) & {PROTOCOL_ICMP, PROTOCOL_UDP}
         for proto in sorted(relevant_protocols):
             proto_name = protocol_names.get(proto, "Unknown")
-            print(f"    {proto}: {proto_name}")
+            print(f"\t{proto}: {proto_name}")
         
-        print()
+        print("=" * 64)
         
-        # Print fragmentation info - only once if all datagrams have same pattern
+        # Print fragmentation info
         if self.fragmentation_info:
-            # Check if all datagrams have the same fragmentation pattern
             frag_patterns = [(info['num_fragments'], info['last_offset']) 
                            for info in self.fragmentation_info.values()]
             unique_patterns = set(frag_patterns)
             
             if len(unique_patterns) == 1:
-                # All datagrams have same pattern, print once
                 pattern = frag_patterns[0]
                 print(f"The number of fragments created from the original datagram is: {pattern[0]}")
                 print(f"The offset of the last fragment is: {pattern[1]}")
             else:
-                # Different patterns, print each
                 for frag_id, info in self.fragmentation_info.items():
                     print(f"The number of fragments created from the original datagram D{frag_id} is: {info['num_fragments']}")
                     print(f"The offset of the last fragment is: {info['last_offset']}")
@@ -525,18 +532,64 @@ class TracerouteAnalyzer:
             print("The number of fragments created from the original datagram is: 0")
             print("The offset of the last fragment is: 0")
         
-        print()
+        print("=" * 64)
         
-        # Print RTT statistics
+        # Print RTT statistics for each router
         for ttl, router_ip in sorted(self.intermediate_routers.items(), key=self.sort_key):
             if router_ip in self.rtts:
                 avg, std = self.calculate_statistics(self.rtts[router_ip])
-                print(f"The avg RTT between {self.source_ip} and {router_ip} is: {avg:.0f} ms, the s.d. is: {std:.0f} ms")
+                print(f"The avg RTT between {self.source_ip} and {router_ip} is: {avg:.6f} ms, the s.d. is: {std:.6f} ms")
         
         # Ultimate destination RTT
         if self.ultimate_dest_ip and self.ultimate_dest_ip in self.rtts:
             avg, std = self.calculate_statistics(self.rtts[self.ultimate_dest_ip])
-            print(f"The avg RTT between {self.source_ip} and {self.ultimate_dest_ip} is: {avg:.0f} ms, the s.d. is: {std:.0f} ms")
+            print(f"The avg RTT between {self.source_ip} and {self.ultimate_dest_ip} is: {avg:.6f} ms, the s.d. is: {std:.6f} ms")
+        
+        print("=" * 64)
+        
+        # Print TTL summary table
+        print("TTL      Average RTT in this Trace File (ms)")
+        
+        # Group RTTs by base TTL value
+        ttl_rtts = defaultdict(list)
+        for ttl, router_ip in self.intermediate_routers.items():
+            base_ttl = int(str(ttl).split('.')[0])
+            if router_ip in self.rtts:
+                ttl_rtts[base_ttl].extend(self.rtts[router_ip])
+        
+        # Also include destination RTTs (these will be at higher TTL values)
+        if self.ultimate_dest_ip and self.ultimate_dest_ip in self.rtts:
+            # Find the maximum TTL used
+            max_ttl = max(int(str(ttl).split('.')[0]) for ttl in self.intermediate_routers.keys())
+            # Destination responses come from TTL values beyond the last intermediate router
+            for pkt in self.packets:
+                if pkt.protocol == 17 and hasattr(pkt, 'dst_port') and pkt.dst_port and \
+                   33434 <= pkt.dst_port <= 33529:
+                    if pkt.ttl > max_ttl:
+                        ttl_rtts[pkt.ttl] = []  # Ensure TTL exists in dict
+            
+            # Add destination RTTs to appropriate TTL values
+            # Need to match destination responses to their TTL values
+            for pkt in self.packets:
+                if pkt.protocol == 1 and hasattr(pkt, 'icmp_type') and pkt.icmp_type == 3:
+                    if pkt.src_ip == self.ultimate_dest_ip:
+                        # Find the original packet's TTL
+                        if hasattr(pkt, 'orig_dst_port'):
+                            for orig_pkt in self.packets:
+                                if orig_pkt.protocol == 17 and hasattr(orig_pkt, 'dst_port') and \
+                                   orig_pkt.dst_port == pkt.orig_dst_port:
+                                    if orig_pkt.ttl not in ttl_rtts or orig_pkt.ttl > max_ttl:
+                                        rtt = pkt.timestamp - orig_pkt.timestamp
+                                        ttl_rtts[orig_pkt.ttl].append(rtt)
+                                    break
+        
+        # Print the summary table
+        for ttl in sorted(ttl_rtts.keys()):
+            if ttl_rtts[ttl]:
+                avg_rtt = sum(ttl_rtts[ttl]) / len(ttl_rtts[ttl])
+                print(f"{ttl:<8} {avg_rtt:>8.2f}")
+            else:
+                print(f"{ttl:<8} {'N/A':>8}")
 
 
 def main():
